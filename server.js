@@ -4,7 +4,7 @@ const path = require("path");
 
 const PORT = Number(process.env.PORT) || 3000;
 const ROOT_DIR = __dirname;
-const DEFAULT_FILE = "step6.html";
+const DEFAULT_FILE = "index.html";
 
 const MIME_TYPES = {
   ".html": "text/html; charset=utf-8",
@@ -18,6 +18,8 @@ const MIME_TYPES = {
   ".svg": "image/svg+xml",
   ".ico": "image/x-icon",
   ".md": "text/markdown; charset=utf-8",
+  ".glb": "model/gltf-binary",
+  ".gltf": "model/gltf+json",
 };
 
 const server = http.createServer((req, res) => {

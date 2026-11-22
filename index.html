@@ -1,0 +1,2111 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Bể cá 3D — Bước 6: Tối ưu & Đóng gói</title>
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #020c18;
+    font-family: Arial, Helvetica, sans-serif;
+  }
+  #info {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    color: #cfe9ff;
+    background: rgba(0, 15, 32, 0.65);
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    line-height: 1.5;
+    z-index: 10;
+    max-width: 340px;
+    border: 1px solid rgba(110, 200, 255, 0.2);
+    backdrop-filter: blur(6px);
+    transition: opacity 0.2s;
+  }
+  #controls {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    z-index: 10;
+    background: rgba(0, 15, 32, 0.65);
+    padding: 12px;
+    border-radius: 10px;
+    border: 1px solid rgba(110, 200, 255, 0.2);
+    backdrop-filter: blur(6px);
+    color: #cfe9ff;
+    font-size: 13px;
+    min-width: 195px;
+    transition: opacity 0.2s;
+  }
+  .btn-row {
+    display: flex;
+    gap: 8px;
+  }
+  button {
+    flex: 1;
+    padding: 7px 10px;
+    border: 1px solid rgba(120, 210, 255, 0.35);
+    border-radius: 6px;
+    background: rgba(15, 65, 110, 0.65);
+    color: #e6f4ff;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.1s;
+  }
+  button:hover {
+    background: rgba(25, 95, 155, 0.85);
+  }
+  button:active {
+    transform: scale(0.97);
+  }
+  button.secondary {
+    background: rgba(20, 45, 75, 0.7);
+  }
+  .status-line {
+    font-size: 12px;
+    color: #9ed4ff;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  #follow-status {
+    font-size: 12px;
+    color: #ffd480;
+    min-height: 16px;
+  }
+  #hud-toggle {
+    position: absolute;
+    bottom: 12px;
+    right: 12px;
+    z-index: 11;
+    flex: none;
+    padding: 6px 12px;
+    font-size: 12px;
+    opacity: 0.75;
+  }
+  #hud-toggle:hover {
+    opacity: 1;
+  }
+  .hud-hidden #info,
+  .hud-hidden #controls {
+    opacity: 0;
+    pointer-events: none;
+  }
+  #error-banner {
+    display: none;
+    position: absolute;
+    inset: 0;
+    z-index: 100;
+    background: rgba(2, 12, 24, 0.94);
+    color: #ffd6d6;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 24px;
+    font-size: 15px;
+    line-height: 1.6;
+  }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+
+<div id="info">
+  <b>Bể cá 3D — Bản hoàn chỉnh</b><br/>
+  • Click vào cá để cá bơi theo chuột (click lại hoặc click ra ngoài để thả tự do).<br/>
+  • Kéo chuột để xoay, cuộn để zoom, phím <b>H</b> để ẩn/hiện giao diện.
+</div>
+
+<div id="controls">
+  <div class="status-line">
+    <span>Số cá trong bể:</span>
+    <b id="fish-count">10</b>
+  </div>
+  <div class="btn-row">
+    <button id="btn-add">+ Thêm cá</button>
+    <button id="btn-remove">- Bớt cá</button>
+  </div>
+  <div class="status-line">
+    <span>Số tép:</span>
+    <b id="shrimp-count">3</b>
+  </div>
+  <div class="btn-row">
+    <button id="btn-add-shrimp">+ Thêm tép</button>
+    <button id="btn-remove-shrimp">- Bớt tép</button>
+  </div>
+  <div class="status-line">
+    <span>Số ốc:</span>
+    <b id="snail-count">5</b>
+  </div>
+  <div class="btn-row">
+    <button id="btn-add-snail">+ Thêm ốc</button>
+    <button id="btn-remove-snail">- Bớt ốc</button>
+  </div>
+  <button id="btn-daynight" class="secondary">Chế độ: Đêm</button>
+  <div id="follow-status">Chưa chọn cá nào</div>
+</div>
+
+<button id="hud-toggle" class="secondary">Ẩn giao diện (H)</button>
+
+<div id="error-banner">
+  <div>
+    <b>Không thể khởi tạo Bể cá 3D</b><br/>
+    Nếu bạn mở trực tiếp bằng giao thức <code>file://</code> và trình duyệt chặn ES module cục bộ (CORS), hãy mở thư mục bằng local server (ví dụ: <code>python -m http.server</code> hoặc Live Server) hoặc bật WebGL trên trình duyệt.
+  </div>
+</div>
+
+<!-- Dùng Three.js r160 đã tải về cục bộ (offline) -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "./lib/three/three.module.js",
+    "three/addons/": "./lib/three/"
+  }
+}
+</script>
+
+<script type="module">
+const errorBanner = document.getElementById("error-banner");
+window.addEventListener("error", () => {
+  if (!window.__AQUARIUM_READY__) {
+    errorBanner.style.display = "flex";
+  }
+});
+
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
+
+// ----------------------------------------------------------------------
+// 1. SCENE / CAMERA / RENDERER
+// ----------------------------------------------------------------------
+const NIGHT_BG = 0x010409;
+const DAY_BG = 0x4ba8cf;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(NIGHT_BG);
+scene.fog = new THREE.FogExp2(NIGHT_BG, 0.042);
+
+const camera = new THREE.PerspectiveCamera(
+  50,
+  window.innerWidth / window.innerHeight,
+  0.1,
+  100
+);
+camera.position.set(0, 4, 11);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 0, 0);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.minDistance = 4;
+controls.maxDistance = 20;
+controls.maxPolarAngle = Math.PI * 0.49;
+controls.update();
+
+// ----------------------------------------------------------------------
+// 2. KÍCH THƯỚC BỂ CÁ
+// ----------------------------------------------------------------------
+const TANK = { width: 8, height: 5, depth: 4.5 };
+const FLOOR_Y = -TANK.height / 2;
+
+// ----------------------------------------------------------------------
+// 3. ÁNH SÁNG (Xung quanh tối, chỉ sáng tập trung ở vùng đèn LED trong bể)
+// ----------------------------------------------------------------------
+const hemiLight = new THREE.HemisphereLight(0x285588, 0x120822, 0.24);
+scene.add(hemiLight);
+
+// Đèn SpotLight duy nhất gắn dưới thanh LED nắp bể -> vật thể & sinh vật chỉ sáng trong vùng nón chiếu
+const mainLight = new THREE.SpotLight(0xdff5ff, 6.5, 8.5, Math.PI * 0.28, 0.45, 1.3);
+mainLight.position.set(0, 2.38, 0.15);
+mainLight.target.position.set(0, FLOOR_Y, 0);
+mainLight.castShadow = true;
+mainLight.shadow.mapSize.set(1024, 1024);
+mainLight.shadow.camera.near = 0.5;
+mainLight.shadow.camera.far = 9;
+scene.add(mainLight);
+scene.add(mainLight.target);
+
+const depthGlow = new THREE.PointLight(0x00d4ff, 1.15, 7.5, 1.8);
+depthGlow.position.set(1.8, 1.4, 1.2);
+scene.add(depthGlow);
+
+// Đèn LED chiếu sáng tập trung từ phía trên mặt trước bên trong bể
+const tankLedFill = new THREE.PointLight(0xdaf4ff, 1.85, 7.5, 1.6);
+tankLedFill.position.set(0, 2.1, 1.8);
+scene.add(tankLedFill);
+
+// ----------------------------------------------------------------------
+// 4. NỀN BỂ — CÁT SAN HÔ TRẮNG XANH
+// ----------------------------------------------------------------------
+const floorGeo = new THREE.PlaneGeometry(TANK.width, TANK.depth, 32, 32);
+const posAttr = floorGeo.attributes.position;
+for (let i = 0; i < posAttr.count; i++) {
+  posAttr.setZ(i, posAttr.getZ(i) + (Math.random() - 0.5) * 0.06);
+}
+floorGeo.computeVertexNormals();
+
+function createSandTextures() {
+  const size = 256;
+  const diffCanvas = document.createElement("canvas");
+  diffCanvas.width = size;
+  diffCanvas.height = size;
+  const dCtx = diffCanvas.getContext("2d");
+
+  const bumpCanvas = document.createElement("canvas");
+  bumpCanvas.width = size;
+  bumpCanvas.height = size;
+  const bCtx = bumpCanvas.getContext("2d");
+
+  dCtx.fillStyle = "#c9dce8";
+  dCtx.fillRect(0, 0, size, size);
+  bCtx.fillStyle = "#808080";
+  bCtx.fillRect(0, 0, size, size);
+
+  // Hạt cát mịn & gợn cát tự nhiên
+  for (let i = 0; i < 6500; i++) {
+    const x = Math.random() * size;
+    const y = Math.random() * size;
+    const r = 0.6 + Math.random() * 1.4;
+    const shade = Math.floor(175 + Math.random() * 75);
+    dCtx.fillStyle = `rgb(${shade - 12}, ${shade}, ${Math.min(255, shade + 14)})`;
+    dCtx.fillRect(x, y, r, r);
+
+    const bVal = Math.floor(90 + Math.random() * 130);
+    bCtx.fillStyle = `rgb(${bVal}, ${bVal}, ${bVal})`;
+    bCtx.fillRect(x, y, r, r);
+  }
+
+  const map = new THREE.CanvasTexture(diffCanvas);
+  map.wrapS = map.wrapT = THREE.RepeatWrapping;
+  map.repeat.set(4, 2.5);
+  map.colorSpace = THREE.SRGBColorSpace;
+
+  const bumpMap = new THREE.CanvasTexture(bumpCanvas);
+  bumpMap.wrapS = bumpMap.wrapT = THREE.RepeatWrapping;
+  bumpMap.repeat.set(4, 2.5);
+
+  return { map, bumpMap };
+}
+
+const sandTex = createSandTextures();
+const floorMat = new THREE.MeshStandardMaterial({
+  color: 0xd4e6f2,
+  map: sandTex.map,
+  bumpMap: sandTex.bumpMap,
+  bumpScale: 0.045,
+  roughness: 0.92,
+  metalness: 0.0,
+});
+const floor = new THREE.Mesh(floorGeo, floorMat);
+floor.rotation.x = -Math.PI / 2;
+floor.position.y = FLOOR_Y;
+floor.receiveShadow = true;
+scene.add(floor);
+
+// ----------------------------------------------------------------------
+// 5. BỂ KÍNH TRONG SUỐT + VIỀN LED XANH DƯƠNG + NẮP BỂ ĐEN
+// ----------------------------------------------------------------------
+const glassMat = new THREE.MeshPhysicalMaterial({
+  color: 0x8be4ff,
+  transparent: true,
+  opacity: 0.14,
+  roughness: 0.05,
+  metalness: 0.05,
+  clearcoat: 1.0,
+  clearcoatRoughness: 0.06,
+  side: THREE.DoubleSide,
+  depthWrite: false,
+});
+
+const tankGeo = new THREE.BoxGeometry(TANK.width, TANK.height, TANK.depth);
+scene.add(new THREE.Mesh(tankGeo, glassMat));
+
+const frameMat = new THREE.LineBasicMaterial({ color: 0x38d6ff, transparent: true, opacity: 0.85 });
+const frame = new THREE.LineSegments(new THREE.EdgesGeometry(tankGeo), frameMat);
+scene.add(frame);
+
+// Nắp bể đen phía trên + thanh đèn LED xanh dương phát sáng (theo ảnh tham chiếu)
+const hoodMesh = new THREE.Mesh(
+  new THREE.BoxGeometry(TANK.width + 0.12, 0.36, TANK.depth + 0.12),
+  new THREE.MeshStandardMaterial({ color: 0x0b0f14, roughness: 0.45, metalness: 0.3 })
+);
+hoodMesh.position.y = TANK.height / 2 + 0.18;
+scene.add(hoodMesh);
+
+const ledStrip = new THREE.Mesh(
+  new THREE.BoxGeometry(TANK.width * 0.94, 0.04, 0.25),
+  new THREE.MeshBasicMaterial({ color: 0x5ce6ff })
+);
+ledStrip.position.y = TANK.height / 2 + 0.01;
+scene.add(ledStrip);
+
+// ----------------------------------------------------------------------
+// 6. MẶT NƯỚC
+// ----------------------------------------------------------------------
+const waterTopGeo = new THREE.PlaneGeometry(TANK.width * 0.98, TANK.depth * 0.98, 28, 18);
+const waterTopBaseZ = new Float32Array(waterTopGeo.attributes.position.count);
+for (let i = 0; i < waterTopBaseZ.length; i++) {
+  waterTopBaseZ[i] = waterTopGeo.attributes.position.getZ(i);
+}
+const waterTopMat = new THREE.MeshPhysicalMaterial({
+  color: 0x5fc9e8,
+  transparent: true,
+  opacity: 0.28,
+  roughness: 0.08,
+  clearcoat: 1.0,
+  clearcoatRoughness: 0.08,
+  side: THREE.DoubleSide,
+  depthWrite: false,
+});
+const waterTop = new THREE.Mesh(waterTopGeo, waterTopMat);
+waterTop.rotation.x = -Math.PI / 2;
+waterTop.position.y = TANK.height / 2 - 0.05;
+scene.add(waterTop);
+
+// ----------------------------------------------------------------------
+// 7. TRANG TRÍ NỀN BỂ (san hô, vỏ ốc, đá sỏi)
+// ----------------------------------------------------------------------
+const decor = new THREE.Group();
+scene.add(decor);
+
+function buildCoralBranch(length, radius, depth, mat) {
+  const group = new THREE.Group();
+  const segGeo = new THREE.CylinderGeometry(radius * 0.45, radius, length, 6);
+  const segMesh = new THREE.Mesh(segGeo, mat);
+  segMesh.position.y = length / 2;
+  segMesh.castShadow = true;
+  segMesh.receiveShadow = true;
+  group.add(segMesh);
+
+  if (depth > 0) {
+    const numBranches = 2 + Math.floor(Math.random() * 2);
+    for (let i = 0; i < numBranches; i++) {
+      const child = buildCoralBranch(
+        length * (0.6 + Math.random() * 0.15),
+        radius * 0.6,
+        depth - 1,
+        mat
+      );
+      child.position.y = length * (0.7 + Math.random() * 0.25);
+      child.rotation.z = (Math.random() - 0.5) * 1.4 + (i % 2 === 0 ? 0.5 : -0.5);
+      child.rotation.x = (Math.random() - 0.5) * 0.8;
+      child.rotation.y = Math.random() * Math.PI * 2;
+      group.add(child);
+    }
+  }
+  return group;
+}
+
+function createCoralCluster(colorHex) {
+  const mat = new THREE.MeshStandardMaterial({
+    color: colorHex,
+    roughness: 0.78,
+    metalness: 0.0,
+  });
+  const cluster = new THREE.Group();
+  for (let i = 0; i < 3; i++) {
+    const branch = buildCoralBranch(0.9 + Math.random() * 0.3, 0.09, 3, mat);
+    branch.position.set((Math.random() - 0.5) * 0.5, 0, (Math.random() - 0.5) * 0.5);
+    branch.rotation.y = Math.random() * Math.PI * 2;
+    branch.rotation.z = (Math.random() - 0.5) * 0.3;
+    cluster.add(branch);
+  }
+  return cluster;
+}
+
+// Các cụm san hô nhánh rực rỡ (tím, hồng san hô, cam neon) như bể san hô LED
+const coral1 = createCoralCluster(0x9b5de5, 0x2d1052);
+coral1.position.set(-TANK.width / 2 + 1.1, FLOOR_Y, -0.3);
+coral1.scale.setScalar(1.15);
+decor.add(coral1);
+
+const coral2 = createCoralCluster(0xf15bb5, 0x4a0e32);
+coral2.position.set(-TANK.width / 2 + 1.9, FLOOR_Y, 0.9);
+coral2.scale.setScalar(0.8);
+decor.add(coral2);
+
+const coral3 = createCoralCluster(0xff7b3d, 0x451806);
+coral3.position.set(TANK.width / 2 - 1.25, FLOOR_Y, -0.65);
+coral3.scale.setScalar(0.85);
+decor.add(coral3);
+
+function createBrainCoral(radius, colorHex) {
+  const mat = new THREE.MeshStandardMaterial({
+    color: colorHex,
+    roughness: 0.88,
+    metalness: 0.0,
+  });
+  const geo = new THREE.IcosahedronGeometry(radius, 3);
+  const pos = geo.attributes.position;
+  const v = new THREE.Vector3();
+  for (let i = 0; i < pos.count; i++) {
+    v.fromBufferAttribute(pos, i);
+    const n = v.clone().normalize();
+    const fold =
+      Math.sin(v.x * 9 + v.y * 3) * Math.cos(v.z * 9 - v.y * 2) * 0.06 +
+      Math.sin(v.y * 14) * 0.02;
+    v.addScaledVector(n, fold);
+    pos.setXYZ(i, v.x, v.y, v.z);
+  }
+  geo.computeVertexNormals();
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  return mesh;
+}
+
+const brain1 = createBrainCoral(0.55, 0x8b6be8, 0x22144d);
+brain1.position.set(-0.6, FLOOR_Y + 0.4, -0.2);
+decor.add(brain1);
+
+const brain2 = createBrainCoral(0.32, 0x38e584, 0x0b4a26);
+brain2.position.set(0.3, FLOOR_Y + 0.22, 0.8);
+decor.add(brain2);
+
+const brain3 = createBrainCoral(0.28, 0xff5fa2, 0x4a1029);
+brain3.position.set(-2.1, FLOOR_Y + 0.18, 1.25);
+decor.add(brain3);
+
+const shellMat = new THREE.MeshStandardMaterial({
+  color: 0xd9c49a,
+  roughness: 0.6,
+  metalness: 0.05,
+});
+
+function createShell(turns, height, startRadius) {
+  const points = [];
+  const steps = 120;
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const angle = t * Math.PI * 2 * turns;
+    const r = startRadius * (1 - t * 0.92);
+    points.push(new THREE.Vector3(Math.cos(angle) * r, t * height, Math.sin(angle) * r));
+  }
+  const curve = new THREE.CatmullRomCurve3(points);
+  const shell = new THREE.Mesh(
+    new THREE.TubeGeometry(curve, 160, startRadius * 0.38, 8, false),
+    shellMat
+  );
+  shell.castShadow = true;
+  shell.receiveShadow = true;
+
+  const tip = new THREE.Mesh(
+    new THREE.ConeGeometry(startRadius * 0.15, height * 0.25, 8),
+    shellMat
+  );
+  tip.position.y = height * 1.02;
+  tip.castShadow = true;
+  shell.add(tip);
+
+  return shell;
+}
+
+const shell = createShell(3.2, 0.9, 0.45);
+shell.rotation.x = Math.PI * 0.42;
+shell.position.set(1.6, FLOOR_Y + 0.08, 1.2);
+decor.add(shell);
+
+const pebbleMat = new THREE.MeshStandardMaterial({
+  color: 0x8f949a,
+  roughness: 0.85,
+  metalness: 0.0,
+});
+
+// Dùng chung 1 geometry sỏi cuội tròn dẹt và scale từng viên để tiết kiệm bộ nhớ GPU
+const sharedPebbleGeo = new THREE.SphereGeometry(1, 7, 5);
+for (let i = 0; i < 18; i++) {
+  const r = 0.045 + Math.random() * 0.055;
+  const pebble = new THREE.Mesh(sharedPebbleGeo, pebbleMat);
+  pebble.scale.set(r * 1.25, r * 0.65, r);
+  pebble.position.set(
+    (Math.random() - 0.5) * (TANK.width - 0.6),
+    FLOOR_Y + r * 0.25,
+    (Math.random() - 0.5) * (TANK.depth - 0.6)
+  );
+  pebble.rotation.y = Math.random() * Math.PI * 2;
+  pebble.castShadow = true;
+  pebble.receiveShadow = true;
+  decor.add(pebble);
+}
+
+// --- 7.2 Rêu xanh & rong thủy sinh đung đưa nhẹ theo dòng nước ---
+const swayingPlants = []; // lưu { pivot, phase, speed, amp, baseRotZ }
+
+const mossMat = new THREE.MeshStandardMaterial({
+  color: 0x2ecc71,
+  roughness: 0.9,
+});
+const seaweedMat = new THREE.MeshStandardMaterial({
+  color: 0x27ae60,
+  roughness: 0.75,
+  side: THREE.DoubleSide,
+});
+
+function createMossPatch(x, y, z, radius = 0.28) {
+  const patch = new THREE.Group();
+  patch.position.set(x, y, z);
+
+  // Đệm rêu tròn dẹt bám nền/đá
+  const cushion = new THREE.Mesh(new THREE.SphereGeometry(radius, 8, 6), mossMat);
+  cushion.scale.set(1.2, 0.35, 1.0);
+  cushion.receiveShadow = true;
+  patch.add(cushion);
+
+  // Các sợi rêu nhỏ vươn lên và đung đưa nhẹ
+  const bladeGeo = new THREE.ConeGeometry(0.025, 0.16, 4);
+  bladeGeo.translate(0, 0.08, 0);
+  for (let i = 0; i < 8; i++) {
+    const pivot = new THREE.Group();
+    const angle = (i / 8) * Math.PI * 2 + Math.random() * 0.4;
+    const dist = Math.random() * radius * 0.65;
+    pivot.position.set(Math.cos(angle) * dist, radius * 0.2, Math.sin(angle) * dist);
+    const blade = new THREE.Mesh(bladeGeo, mossMat);
+    blade.scale.y = 0.7 + Math.random() * 0.7;
+    pivot.add(blade);
+    patch.add(pivot);
+
+    swayingPlants.push({
+      pivot,
+      phase: Math.random() * Math.PI * 2,
+      speed: 1.5 + Math.random() * 0.6,
+      amp: 0.14 + Math.random() * 0.08,
+      baseRotZ: (Math.random() - 0.5) * 0.15,
+    });
+  }
+  decor.add(patch);
+}
+
+// Rải cụm rêu xanh trên nền cát và chân đá
+createMossPatch(0.85, FLOOR_Y + 0.02, -0.55, 0.25);
+createMossPatch(2.55, FLOOR_Y + 0.02, 0.35, 0.28);
+createMossPatch(-1.3, FLOOR_Y + 0.02, 0.85, 0.28);
+createMossPatch(0.15, FLOOR_Y + 0.02, -1.25, 0.24);
+createMossPatch(-2.5, FLOOR_Y + 0.02, -1.3, 0.26);
+
+function createSeaweedCluster(x, z, blades = 5, baseHeight = 1.4) {
+  const cluster = new THREE.Group();
+  cluster.position.set(x, FLOOR_Y, z);
+
+  for (let b = 0; b < blades; b++) {
+    const bladeRoot = new THREE.Group();
+    bladeRoot.position.set((Math.random() - 0.5) * 0.25, 0, (Math.random() - 0.5) * 0.25);
+    bladeRoot.rotation.y = Math.random() * Math.PI * 2;
+
+    let parent = bladeRoot;
+    const segs = 4;
+    const segH = (baseHeight * (0.75 + Math.random() * 0.5)) / segs;
+    const phase = Math.random() * Math.PI * 2;
+
+    for (let s = 0; s < segs; s++) {
+      const pivot = new THREE.Group();
+      if (s > 0) pivot.position.y = segH;
+      const w = 0.09 * (1 - s * 0.18);
+      const segGeo = new THREE.PlaneGeometry(w, segH);
+      segGeo.translate(0, segH / 2, 0);
+      const segMesh = new THREE.Mesh(segGeo, seaweedMat);
+      segMesh.castShadow = true;
+      pivot.add(segMesh);
+      parent.add(pivot);
+      parent = pivot;
+
+      swayingPlants.push({
+        pivot,
+        phase: phase - s * 0.55,
+        speed: 1.45,
+        amp: 0.11 + s * 0.035,
+        baseRotZ: 0,
+      });
+    }
+    cluster.add(bladeRoot);
+  }
+  decor.add(cluster);
+}
+
+createSeaweedCluster(-TANK.width / 2 + 0.55, -1.45, 5, 1.8);
+createSeaweedCluster(TANK.width / 2 - 0.6, -1.35, 5, 1.65);
+createSeaweedCluster(TANK.width / 2 - 0.7, 1.4, 4, 1.3);
+
+// --- 7.3 Ốc cảnh (bò dưới đáy & bám bò trên thành kính) ---
+const animatedSnails = [];
+const snailBodyMat = new THREE.MeshStandardMaterial({ color: 0xe8c99b, roughness: 0.7 });
+const snailShellMat = new THREE.MeshStandardMaterial({ color: 0xc97b36, roughness: 0.55 });
+
+function createAnimatedSnail({ surface = "floor", cx = 0, cy = 0, cz = 0, orbitR = 0.3, speed = 0.15 }) {
+  const root = new THREE.Group();
+  const bodyGroup = new THREE.Group();
+
+  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.045, 0.12, 4, 8), snailBodyMat);
+  body.rotation.x = Math.PI / 2;
+  body.scale.y = 0.7;
+  body.castShadow = true;
+  bodyGroup.add(body);
+
+  const shellMini = new THREE.Mesh(new THREE.SphereGeometry(0.085, 10, 8), snailShellMat);
+  shellMini.position.set(0, 0.075, -0.02);
+  shellMini.scale.set(0.85, 1.0, 1.05);
+  shellMini.castShadow = true;
+  bodyGroup.add(shellMini);
+
+  const stalkGeo = new THREE.CylinderGeometry(0.006, 0.008, 0.07, 4);
+  stalkGeo.translate(0, 0.035, 0);
+  const stalkL = new THREE.Mesh(stalkGeo, snailBodyMat);
+  stalkL.position.set(-0.022, 0.03, 0.08);
+  stalkL.rotation.x = 0.35;
+  const stalkR = stalkL.clone();
+  stalkR.position.x = 0.022;
+  bodyGroup.add(stalkL, stalkR);
+
+  root.add(bodyGroup);
+  decor.add(root);
+
+  animatedSnails.push({
+    root,
+    bodyGroup,
+    stalkL,
+    stalkR,
+    surface,
+    cx,
+    cy,
+    cz,
+    orbitR,
+    speed,
+    phase: Math.random() * Math.PI * 2,
+  });
+}
+
+// 2 con ốc bò dưới nền cát
+createAnimatedSnail({ surface: "floor", cx: -0.9, cz: 1.15, orbitR: 0.35, speed: 0.18 });
+createAnimatedSnail({ surface: "floor", cx: 2.1, cz: 0.85, orbitR: 0.28, speed: -0.15 });
+// 3 con ốc bám & bò trên thành kính (mặt trước, trái, phải)
+createAnimatedSnail({ surface: "front", cx: -1.4, cy: -0.4, orbitR: 0.45, speed: 0.12 });
+createAnimatedSnail({ surface: "front", cx: 1.85, cy: 0.55, orbitR: 0.38, speed: -0.11 });
+createAnimatedSnail({ surface: "left", cy: 0.15, cz: 0.4, orbitR: 0.42, speed: 0.13 });
+
+// --- 7.4 Tép cảnh (Red Cherry Shrimp) bò & đung đưa râu ---
+const animatedShrimps = [];
+const shrimpRedMat = new THREE.MeshStandardMaterial({
+  color: 0xff3b30,
+  roughness: 0.45,
+});
+const shrimpWhiteMat = new THREE.MeshStandardMaterial({ color: 0xfff0eb, roughness: 0.5 });
+
+function createAnimatedShrimp(cx, cz, orbitR) {
+  const root = new THREE.Group();
+  root.position.set(cx, FLOOR_Y + 0.07, cz);
+  const bodyGroup = new THREE.Group();
+
+  for (let i = 0; i < 4; i++) {
+    const r = 0.034 - i * 0.004;
+    const seg = new THREE.Mesh(
+      new THREE.SphereGeometry(r, 7, 6),
+      i === 1 ? shrimpWhiteMat : shrimpRedMat
+    );
+    seg.scale.set(0.8, 0.9, 1.25);
+    seg.position.set(0, Math.sin(i * 0.5) * 0.015, 0.05 - i * 0.045);
+    seg.castShadow = true;
+    bodyGroup.add(seg);
+  }
+
+  const tailFan = new THREE.Mesh(new THREE.ConeGeometry(0.032, 0.05, 3), shrimpRedMat);
+  tailFan.rotation.x = -Math.PI / 2;
+  tailFan.scale.y = 0.25;
+  tailFan.position.set(0, -0.01, -0.13);
+  bodyGroup.add(tailFan);
+
+  const antGeo = new THREE.CylinderGeometry(0.003, 0.004, 0.14, 4);
+  antGeo.translate(0, 0.07, 0);
+  const antL = new THREE.Mesh(antGeo, shrimpWhiteMat);
+  antL.position.set(-0.015, 0.01, 0.075);
+  antL.rotation.x = Math.PI * 0.42;
+  antL.rotation.z = 0.25;
+
+  const antR = new THREE.Mesh(antGeo, shrimpWhiteMat);
+  antR.position.set(0.015, 0.01, 0.075);
+  antR.rotation.x = Math.PI * 0.42;
+  antR.rotation.z = -0.25;
+  // Gắn râu lên root để giữ nguyên khi thay bodyGroup bằng Shrimp.glb
+  root.add(antL, antR);
+
+  root.add(bodyGroup);
+  decor.add(root);
+  animatedShrimps.push({
+    root,
+    bodyGroup,
+    antL,
+    antR,
+    cx,
+    cz,
+    targetX: cx + (Math.random() - 0.5) * 0.8,
+    targetZ: cz + (Math.random() - 0.5) * 0.8,
+    state: "crawl",
+    stateTimer: 1.5 + Math.random() * 2.0,
+    hopProgress: 0,
+    hopHeight: 0.25,
+    speed: 0.28 + Math.random() * 0.16,
+    phase: Math.random() * Math.PI * 2,
+  });
+}
+
+createAnimatedShrimp(0.55, 0.35, 0.32);
+createAnimatedShrimp(-1.85, 0.45, 0.28);
+createAnimatedShrimp(1.25, -0.15, 0.25);
+
+// ----------------------------------------------------------------------
+// 8. CÁ BƠI ĐỘNG (Dùng chung geometry & material tĩnh để tối ưu hiệu năng)
+// ----------------------------------------------------------------------
+function createClownTexture() {
+  const canvas = document.createElement("canvas");
+  canvas.width = 64;
+  canvas.height = 128;
+  const ctx = canvas.getContext("2d");
+
+  // Nền cam đậm cá hề
+  ctx.fillStyle = "#ff7a1f";
+  ctx.fillRect(0, 0, 64, 128);
+
+  // 2 sọc trắng viền đen (Canvas y=0 là mũi v=1, y=128 là đuôi v=0)
+  const stripes = [
+    { y: 44, h: 14 },
+    { y: 78, h: 14 },
+  ];
+  for (const s of stripes) {
+    ctx.fillStyle = "#141414";
+    ctx.fillRect(0, s.y - 3, 64, s.h + 6);
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, s.y, 64, s.h);
+  }
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+const FISH_BASE_BODY_GEO = new THREE.LatheGeometry([
+  new THREE.Vector2(0.0, -0.55),
+  new THREE.Vector2(0.05, -0.42),
+  new THREE.Vector2(0.14, -0.22),
+  new THREE.Vector2(0.2, -0.02),
+  new THREE.Vector2(0.19, 0.16),
+  new THREE.Vector2(0.13, 0.32),
+  new THREE.Vector2(0.06, 0.44),
+  new THREE.Vector2(0.0, 0.5),
+], 10);
+
+// Tạo vây đuôi đứng hình quạt chẻ đuôi tự nhiên (nằm trong mặt phẳng Y-Z)
+function createVerticalTailGeo() {
+  const shape = new THREE.Shape();
+  shape.moveTo(0, 0.03);
+  shape.quadraticCurveTo(-0.14, 0.14, -0.26, 0.22);
+  shape.quadraticCurveTo(-0.18, 0.06, -0.14, 0);
+  shape.quadraticCurveTo(-0.18, -0.06, -0.26, -0.22);
+  shape.quadraticCurveTo(-0.14, -0.14, 0, -0.03);
+  shape.closePath();
+
+  const geo = new THREE.ShapeGeometry(shape, 8);
+  // Xoay để mặt phẳng vây nằm dọc theo trục Z (đứng thẳng) và hướng ra sau (-Y)
+  geo.rotateZ(Math.PI / 2);
+  geo.rotateY(Math.PI / 2);
+  return geo;
+}
+
+const FISH_SHARED = {
+  bodyBasePos: new Float32Array(FISH_BASE_BODY_GEO.attributes.position.array),
+  clownTex: createClownTexture(),
+  eyeGeo: new THREE.SphereGeometry(0.035, 6, 6),
+  eyeMat: new THREE.MeshStandardMaterial({ color: 0x111111 }),
+  finMatClown: new THREE.MeshStandardMaterial({
+    color: 0xe85d00,
+    roughness: 0.55,
+    transparent: true,
+    opacity: 0.88,
+    side: THREE.DoubleSide,
+  }),
+  finMatGold: new THREE.MeshStandardMaterial({
+    color: 0xff8c3d,
+    roughness: 0.55,
+    transparent: true,
+    opacity: 0.88,
+    side: THREE.DoubleSide,
+  }),
+  tailFinGeo: createVerticalTailGeo(),
+  dorsalFinGeo: new THREE.ConeGeometry(0.14, 0.24, 3),
+  pecFinGeo: new THREE.ConeGeometry(0.09, 0.16, 3),
+};
+
+const FISH_SPECIES = [
+  { key: "clownfish", label: "Cá hề Nemo", url: "./assets/models/Clownfish.glb", targetSize: 0.85, glowColor: 0xff6b2b },
+  { key: "yellowTang", label: "Cá đuôi gai vàng", url: "./assets/models/YellowTang.glb", targetSize: 0.92, glowColor: 0xffd426 },
+  { key: "blueTang", label: "Cá Dory xanh", url: "./assets/models/BlueTang.glb", targetSize: 0.9, glowColor: 0x2299ff },
+  { key: "betta", label: "Cá Xiêm Betta", url: "./assets/models/Betta.glb", targetSize: 0.92, glowColor: 0xc84bff },
+  { key: "goldfish", label: "Cá vàng", url: "./assets/models/Goldfish.glb", targetSize: 0.88, glowColor: 0xff8c24 },
+  { key: "tetra", label: "Cá Neon Tetra", url: "./assets/models/Tetra.glb", targetSize: 0.68, glowColor: 0x00f0ff },
+  { key: "butterflyFish", label: "Cá bướm", url: "./assets/models/ButterflyFish.glb", targetSize: 0.88, glowColor: 0xffb84d },
+  { key: "seahorse", label: "Cá ngựa", url: "./assets/models/Seahorse.glb", targetSize: 0.68, isSeahorse: true, glowColor: 0xffaa33 },
+];
+const MODEL_CACHE = {};
+
+function makeSharedFin(geo, mat) {
+  const fin = new THREE.Mesh(geo, mat);
+  fin.scale.z = 0.08;
+  fin.castShadow = true;
+  return fin;
+}
+
+function createProceduralFish(type) {
+  const isClown = type === "clown";
+  const finMat = isClown ? FISH_SHARED.finMatClown : FISH_SHARED.finMatGold;
+
+  const group = new THREE.Group();
+
+  const bodyGeo = FISH_BASE_BODY_GEO.clone();
+  const bodyMat = new THREE.MeshStandardMaterial({
+    color: isClown ? 0xffffff : 0xffa23d,
+    map: isClown ? FISH_SHARED.clownTex : null,
+    roughness: 0.48,
+    metalness: 0.1,
+  });
+  const bodyMesh = new THREE.Mesh(bodyGeo, bodyMat);
+  bodyMesh.scale.x = 0.55;
+  bodyMesh.castShadow = true;
+  group.add(bodyMesh);
+
+  for (const side of [-1, 1]) {
+    const eye = new THREE.Mesh(FISH_SHARED.eyeGeo, FISH_SHARED.eyeMat);
+    eye.position.set(0.16 * side, 0.34, 0.1);
+    bodyMesh.add(eye);
+  }
+
+  // Vây đuôi đứng tự nhiên (không ép scale.z nữa vì đã nằm trong mặt phẳng Y-Z)
+  const tailPivot = new THREE.Group();
+  tailPivot.position.set(0, -0.5, 0);
+  const tailFin = new THREE.Mesh(FISH_SHARED.tailFinGeo, finMat);
+  tailFin.castShadow = true;
+  tailPivot.add(tailFin);
+  group.add(tailPivot);
+
+  const dorsal = makeSharedFin(FISH_SHARED.dorsalFinGeo, finMat);
+  dorsal.rotation.x = Math.PI / 2;
+  dorsal.position.set(0, 0.05, 0.14);
+  group.add(dorsal);
+
+  const pecL = makeSharedFin(FISH_SHARED.pecFinGeo, finMat);
+  pecL.rotation.z = Math.PI / 2;
+  pecL.position.set(-0.13, 0.02, 0.05);
+  group.add(pecL);
+
+  const pecR = makeSharedFin(FISH_SHARED.pecFinGeo, finMat);
+  pecR.rotation.z = -Math.PI / 2;
+  pecR.position.set(0.13, 0.02, 0.05);
+  group.add(pecR);
+
+  return { isGLB: false, group, bodyGeo, bodyMesh, dorsal, tailPivot, pecL, pecR, materials: [bodyMat] };
+}
+
+function createSeahorse() {
+  const group = new THREE.Group();
+  const bodyMat = new THREE.MeshStandardMaterial({
+    color: 0xffa834,
+    roughness: 0.5,
+    metalness: 0.08,
+  });
+  const finMat = new THREE.MeshStandardMaterial({
+    color: 0xffd27d,
+    roughness: 0.45,
+    transparent: true,
+    opacity: 0.82,
+    side: THREE.DoubleSide,
+  });
+
+  // Thân cong chữ S đứng thẳng + đuôi cuộn tròn ở dưới
+  const spinePts = [
+    new THREE.Vector3(0, 0.34, 0.03),   // đỉnh đầu
+    new THREE.Vector3(0, 0.24, 0.06),   // cổ
+    new THREE.Vector3(0, 0.08, 0.09),   // ngực/bụng phình
+    new THREE.Vector3(0, -0.1, 0.03),   // eo
+    new THREE.Vector3(0, -0.26, -0.02), // cuống đuôi
+    new THREE.Vector3(0, -0.37, 0.06),  // đuôi cuộn vào trong
+    new THREE.Vector3(0, -0.33, 0.14),
+    new THREE.Vector3(0, -0.26, 0.11),
+  ];
+  const radii = [0.065, 0.052, 0.095, 0.062, 0.038, 0.025, 0.018, 0.014];
+  const disposables = [];
+
+  for (let i = 0; i < spinePts.length; i++) {
+    const segGeo = new THREE.SphereGeometry(radii[i], 8, 7);
+    const seg = new THREE.Mesh(segGeo, bodyMat);
+    seg.position.copy(spinePts[i]);
+    if (i === 2) seg.scale.set(0.85, 1.35, 1.15);
+    seg.castShadow = true;
+    group.add(seg);
+    disposables.push(segGeo);
+  }
+
+  // Mõm ống dài hướng về +Z
+  const snoutGeo = new THREE.CylinderGeometry(0.018, 0.032, 0.14, 7);
+  snoutGeo.rotateX(Math.PI / 2);
+  const snout = new THREE.Mesh(snoutGeo, bodyMat);
+  snout.position.set(0, 0.31, 0.11);
+  snout.castShadow = true;
+  group.add(snout);
+  disposables.push(snoutGeo);
+
+  // Vương miện nhỏ trên đầu
+  const crownGeo = new THREE.ConeGeometry(0.04, 0.08, 5);
+  const crown = new THREE.Mesh(crownGeo, bodyMat);
+  crown.position.set(0, 0.41, 0.01);
+  crown.rotation.x = -0.25;
+  group.add(crown);
+  disposables.push(crownGeo);
+
+  // Mắt 2 bên đầu
+  for (const side of [-1, 1]) {
+    const eye = new THREE.Mesh(FISH_SHARED.eyeGeo, FISH_SHARED.eyeMat);
+    eye.scale.setScalar(0.75);
+    eye.position.set(0.052 * side, 0.34, 0.055);
+    group.add(eye);
+  }
+
+  // Vây lưng nhỏ phía sau (-Z) rung nhanh
+  const dorsalGeo = new THREE.PlaneGeometry(0.09, 0.16);
+  dorsalGeo.translate(0, 0, -0.045);
+  dorsalGeo.rotateY(Math.PI / 2);
+  const dorsal = new THREE.Mesh(dorsalGeo, finMat);
+  dorsal.position.set(0, 0.03, -0.01);
+  group.add(dorsal);
+  disposables.push(dorsalGeo);
+
+  // 2 vây tai nhỏ 2 bên cổ
+  const earGeo = new THREE.PlaneGeometry(0.05, 0.06);
+  const earL = new THREE.Mesh(earGeo, finMat);
+  earL.position.set(-0.06, 0.27, 0.02);
+  earL.rotation.y = 0.5;
+  const earR = earL.clone();
+  earR.position.x = 0.06;
+  earR.rotation.y = -0.5;
+  group.add(earL, earR);
+  disposables.push(earGeo);
+
+  return {
+    isGLB: false,
+    isSeahorse: true,
+    group,
+    dorsal,
+    earL,
+    earR,
+    disposables,
+    materials: [bodyMat, finMat],
+  };
+}
+
+function createGLBFish(speciesKey, isSeahorse = false) {
+  const cached = MODEL_CACHE[speciesKey];
+  if (!cached) return null;
+
+  const group = new THREE.Group();
+  const modelRoot = SkeletonUtils.clone(cached.scene);
+  modelRoot.scale.setScalar(cached.normScale);
+
+  if (isSeahorse) {
+    // Seahorse.glb đã đứng thẳng (+Y lên, +Z hướng về trước), chỉ cần căn giữa
+    modelRoot.position.copy(cached.centerOffset).multiplyScalar(-cached.normScale);
+  } else {
+    // Chuyển hướng chuẩn glTF (+Z tiến, +Y lên) sang hệ trục cá (+Y tiến, +Z vây lưng lên)
+    modelRoot.setRotationFromEuler(new THREE.Euler(Math.PI / 2, Math.PI, 0, "XYZ"));
+  }
+
+  const materials = [];
+  modelRoot.traverse((obj) => {
+    if (obj.isMesh) {
+      obj.frustumCulled = false; // tránh ẩn SkinnedMesh khi bone scale làm lệch boundingSphere gốc
+      obj.castShadow = true;
+      obj.receiveShadow = true;
+      if (obj.material) {
+        obj.material = obj.material.clone();
+        // Dùng chính texture làm emissiveMap để khi phát sáng vẫn giữ nguyên sọc, mắt, vây rõ nét
+        if (obj.material.map) {
+          obj.material.emissiveMap = obj.material.map;
+        }
+        materials.push(obj.material);
+      }
+    }
+  });
+  group.add(modelRoot);
+
+  const mixer = cached.animations.length > 0 ? new THREE.AnimationMixer(modelRoot) : null;
+  let normalAction = null;
+  let fastAction = null;
+  if (mixer) {
+    const normalClip =
+      cached.animations.find((a) => a.name.includes("Swimming_Normal")) ||
+      cached.animations[0];
+    const fastClip = cached.animations.find((a) => a.name.includes("Swimming_Fast"));
+
+    normalAction = normalClip ? mixer.clipAction(normalClip) : null;
+    fastAction = fastClip ? mixer.clipAction(fastClip) : null;
+    if (normalAction) {
+      normalAction.time = Math.random() * normalClip.duration;
+      normalAction.play();
+    }
+  }
+
+  return {
+    isGLB: true,
+    isSeahorse,
+    group,
+    modelRoot,
+    mixer,
+    normalAction,
+    fastAction,
+    materials,
+  };
+}
+
+const SWIM_BOUNDS = {
+  xMin: -TANK.width / 2 + 0.6,
+  xMax: TANK.width / 2 - 0.6,
+  yMin: FLOOR_Y + 0.7,
+  yMax: TANK.height / 2 - 0.9,
+  zMin: -TANK.depth / 2 + 0.5,
+  zMax: TANK.depth / 2 - 0.5,
+};
+
+function randomPointInTank(out = new THREE.Vector3()) {
+  return out.set(
+    THREE.MathUtils.randFloat(SWIM_BOUNDS.xMin, SWIM_BOUNDS.xMax),
+    THREE.MathUtils.randFloat(SWIM_BOUNDS.yMin, SWIM_BOUNDS.yMax),
+    THREE.MathUtils.randFloat(SWIM_BOUNDS.zMin, SWIM_BOUNDS.zMax)
+  );
+}
+
+// Biến tạm tái sử dụng trong vòng lặp để tránh cấp phát bộ nhớ mỗi frame
+const _toTarget = new THREE.Vector3();
+const _desired = new THREE.Vector3();
+const _steer = new THREE.Vector3();
+const _dir = new THREE.Vector3();
+const _right = new THREE.Vector3();
+const _dorsal = new THREE.Vector3();
+const _worldUp = new THREE.Vector3(0, 1, 0);
+const _basisMat = new THREE.Matrix4();
+const _quat = new THREE.Quaternion();
+const _rollQuat = new THREE.Quaternion();
+const _yAxis = new THREE.Vector3(0, 1, 0);
+
+const _sepDiff = new THREE.Vector3();
+const _tmpGlowColor = new THREE.Color();
+
+class Fish {
+  constructor(speciesKey) {
+    const species = FISH_SPECIES.find((s) => s.key === speciesKey) || FISH_SPECIES[0];
+    this.speciesKey = species.key;
+    this.label = species.label;
+    this.glowColor = species.glowColor || 0x33aaff;
+
+    let built = createGLBFish(species.key, Boolean(species.isSeahorse));
+    if (!built) {
+      built = species.isSeahorse
+        ? createSeahorse()
+        : createProceduralFish(species.key === "clownfish" ? "clown" : "gold");
+    }
+
+    this.isGLB = built.isGLB;
+    this.isSeahorse = Boolean(built.isSeahorse);
+    this.group = built.group;
+    this.modelRoot = built.modelRoot || null;
+    this.materials = built.materials;
+
+    if (this.isGLB) {
+      this.mixer = built.mixer;
+      this.normalAction = built.normalAction;
+      this.fastAction = built.fastAction;
+    } else if (this.isSeahorse) {
+      this.dorsal = built.dorsal;
+      this.earL = built.earL;
+      this.earR = built.earR;
+      this.disposables = built.disposables;
+    } else {
+      this.bodyGeo = built.bodyGeo;
+      this.bodyMesh = built.bodyMesh;
+      this.dorsal = built.dorsal;
+      this.tailPivot = built.tailPivot;
+      this.pecL = built.pecL;
+      this.pecR = built.pecR;
+    }
+
+    this.group.traverse((child) => {
+      child.userData.fish = this;
+    });
+
+    this.position = randomPointInTank();
+    this.target = randomPointInTank();
+    this.velocity = new THREE.Vector3(
+      (Math.random() - 0.5) * 0.6,
+      (Math.random() - 0.5) * 0.2,
+      (Math.random() - 0.5) * 0.6
+    );
+    this.baseSpeed = this.isSeahorse
+      ? THREE.MathUtils.randFloat(0.28, 0.48)
+      : THREE.MathUtils.randFloat(0.55, 1.05);
+    this.speed = this.baseSpeed;
+    this.wagPhase = Math.random() * Math.PI * 2;
+    this.swimCycle = 0;
+    this.bankAngle = 0;
+    this.isFollowing = false;
+
+    const scale = THREE.MathUtils.randFloat(0.85, 1.25);
+    this.group.scale.setScalar(scale);
+    this.group.position.copy(this.position);
+
+    scene.add(this.group);
+  }
+
+  setHighlighted(active) {
+    this.isFollowing = active;
+    this.speed = active ? Math.max(this.baseSpeed * 1.6, 1.45) : this.baseSpeed;
+    if (this.isGLB && this.fastAction && this.normalAction) {
+      if (active) {
+        this.fastAction.reset().play();
+        this.normalAction.crossFadeTo(this.fastAction, 0.25, true);
+      } else {
+        this.normalAction.reset().play();
+        this.fastAction.crossFadeTo(this.normalAction, 0.35, true);
+      }
+    }
+  }
+
+  dispose() {
+    scene.remove(this.group);
+    if (this.bodyGeo) this.bodyGeo.dispose();
+    if (this.disposables) {
+      for (const g of this.disposables) g.dispose();
+    }
+    for (const mat of this.materials) {
+      mat.dispose();
+    }
+  }
+
+  update(dt, elapsed) {
+    _toTarget.subVectors(this.target, this.position);
+    const dist = _toTarget.length();
+    if (!this.isFollowing && dist < 0.75) {
+      randomPointInTank(this.target);
+      _toTarget.subVectors(this.target, this.position);
+    }
+
+    const burstWave = 0.5 + 0.5 * Math.sin(elapsed * 1.15 + this.wagPhase);
+    const rhythm = this.isFollowing ? 1.0 : 0.65 + 0.48 * Math.pow(burstWave, 1.6);
+    const targetSpeed = this.speed * rhythm;
+
+    if (dist > 0.06) {
+      _desired.copy(_toTarget).normalize().multiplyScalar(targetSpeed);
+
+      _steer.set(0, 0, 0);
+      const margin = 0.45;
+      if (this.position.x < SWIM_BOUNDS.xMin + margin) _steer.x += 0.85;
+      if (this.position.x > SWIM_BOUNDS.xMax - margin) _steer.x -= 0.85;
+      if (this.position.y < SWIM_BOUNDS.yMin + margin) _steer.y += 0.85;
+      if (this.position.y > SWIM_BOUNDS.yMax - margin) _steer.y -= 0.85;
+      if (this.position.z < SWIM_BOUNDS.zMin + margin) _steer.z += 0.85;
+      if (this.position.z > SWIM_BOUNDS.zMax - margin) _steer.z -= 0.85;
+
+      for (let i = 0; i < fishList.length; i++) {
+        const other = fishList[i];
+        if (other === this) continue;
+        _sepDiff.subVectors(this.position, other.position);
+        const dSq = _sepDiff.lengthSq();
+        if (dSq > 0.0001 && dSq < 0.56) {
+          const d = Math.sqrt(dSq);
+          _steer.addScaledVector(_sepDiff, (0.75 - d) / d * 0.9);
+        }
+      }
+
+      _desired.add(_steer);
+      const turnRate = this.isFollowing ? 4.2 : 1.85;
+      this.velocity.lerp(_desired, 1 - Math.exp(-turnRate * dt));
+    } else if (this.isFollowing) {
+      this.velocity.multiplyScalar(Math.exp(-4.0 * dt));
+    }
+
+    this.position.addScaledVector(this.velocity, dt);
+    this.position.y += Math.sin(elapsed * 2.1 + this.wagPhase) * 0.035 * dt;
+    this.position.x = THREE.MathUtils.clamp(this.position.x, SWIM_BOUNDS.xMin, SWIM_BOUNDS.xMax);
+    this.position.y = THREE.MathUtils.clamp(this.position.y, SWIM_BOUNDS.yMin, SWIM_BOUNDS.yMax);
+    this.position.z = THREE.MathUtils.clamp(this.position.z, SWIM_BOUNDS.zMin, SWIM_BOUNDS.zMax);
+    this.group.position.copy(this.position);
+
+    const speedNow = this.velocity.length();
+    if (speedNow > 0.01) {
+      if (this.isSeahorse) {
+        // Cá ngựa bơi thẳng đứng, chỉ xoay hướng ngang và hơi nghiêng nhẹ về phía trước
+        const yaw = Math.atan2(this.velocity.x, this.velocity.z);
+        const tilt = THREE.MathUtils.clamp(speedNow * 0.22, 0.04, 0.26);
+        _quat.setFromEuler(new THREE.Euler(tilt, yaw, 0, "YXZ"));
+        this.group.quaternion.slerp(_quat, 1 - Math.exp(-4.0 * dt));
+      } else {
+        _dir.copy(this.velocity).divideScalar(speedNow);
+        _right.crossVectors(_dir, _worldUp);
+        if (_right.lengthSq() < 0.0001) {
+          _right.set(1, 0, 0);
+        } else {
+          _right.normalize();
+        }
+        _dorsal.crossVectors(_right, _dir).normalize();
+
+        _basisMat.makeBasis(_right, _dir, _dorsal);
+        _quat.setFromRotationMatrix(_basisMat);
+
+        const desiredRightDot = _desired.dot(_right);
+        const targetBank = THREE.MathUtils.clamp(-desiredRightDot * 0.35, -0.45, 0.45);
+        this.bankAngle = THREE.MathUtils.lerp(this.bankAngle, targetBank, 1 - Math.exp(-5.0 * dt));
+        _rollQuat.setFromAxisAngle(_yAxis, this.bankAngle);
+        _quat.multiply(_rollQuat);
+
+        const rotAlpha = 1 - Math.exp(-(this.isFollowing ? 8.0 : 5.0) * dt);
+        this.group.quaternion.slerp(_quat, rotAlpha);
+      }
+    }
+
+    // Sinh vật không tự phát sáng, chỉ giữ highlight nhẹ khi đang được click dẫn theo chuột
+    for (let i = 0; i < this.materials.length; i++) {
+      const mat = this.materials[i];
+      if (!mat.emissive) continue;
+      if (this.isFollowing) {
+        mat.emissive.setHex(0x3377bb);
+        mat.emissiveIntensity = mat.emissiveMap ? 0.65 : 0.35;
+      } else {
+        mat.emissive.setHex(0x000000);
+        mat.emissiveIntensity = 0;
+      }
+    }
+
+    if (this.isGLB) {
+      if (this.mixer) {
+        // Đồng bộ tốc độ animation xương của model GLB theo tốc độ bơi thực tế
+        this.mixer.timeScale = 0.75 + speedNow * 0.95;
+        this.mixer.update(dt);
+      } else if (this.isSeahorse && this.modelRoot) {
+        // Đung đưa nhẹ cho model cá ngựa GLB khi bơi
+        this.modelRoot.rotation.z = Math.sin(elapsed * 4.2 + this.wagPhase) * 0.07;
+      }
+    } else if (this.isSeahorse) {
+      // Vây lưng cá ngựa rung nhanh đặc trưng + vây tai quạt nhẹ
+      this.dorsal.rotation.y = Math.sin(elapsed * 24 + this.wagPhase) * 0.48;
+      const earFlap = Math.sin(elapsed * 12 + this.wagPhase) * 0.28;
+      this.earL.rotation.y = 0.5 + earFlap;
+      this.earR.rotation.y = -0.5 - earFlap;
+    } else {
+      const speedFactor = THREE.MathUtils.clamp(speedNow / 1.1, 0.25, 1.4);
+      const wagFreq = 5.0 + speedNow * 5.8;
+      this.swimCycle += dt * wagFreq;
+      const phase = this.swimCycle + this.wagPhase;
+      const ampScale = 0.65 + 0.45 * speedFactor;
+
+      const posAttr = this.bodyGeo.attributes.position;
+      const basePos = FISH_SHARED.bodyBasePos;
+      for (let i = 0; i < posAttr.count; i++) {
+        const idx = i * 3;
+        const x0 = basePos[idx];
+        const y0 = basePos[idx + 1];
+        const t = THREE.MathUtils.clamp((0.5 - y0) / 1.05, 0, 1);
+        const bend = (0.012 + 0.14 * t * t) * ampScale;
+        posAttr.setX(i, x0 + Math.sin(phase - t * 3.1) * bend);
+      }
+      posAttr.needsUpdate = true;
+
+      this.tailPivot.position.x = Math.sin(phase - 2.95) * 0.13 * ampScale * 0.55;
+      this.tailPivot.rotation.z = Math.sin(phase - 3.6) * 0.55 * ampScale;
+      this.dorsal.position.x = Math.sin(phase - 1.3) * 0.03 * ampScale * 0.55;
+
+      const pecFlap = Math.sin(phase * 0.7) * (0.24 + 0.12 * Math.abs(this.bankAngle));
+      this.pecL.rotation.y = pecFlap;
+      this.pecR.rotation.y = -pecFlap;
+    }
+  }
+}
+
+const fishList = [];
+const INITIAL_SPECIES = [
+  "clownfish",
+  "clownfish",
+  "yellowTang",
+  "blueTang",
+  "betta",
+  "goldfish",
+  "tetra",
+  "butterflyFish",
+  "seahorse",
+  "seahorse",
+];
+
+// Tải trước tất cả model cá cảnh & cá ngựa miễn phí từ assets/models/
+const gltfLoader = new GLTFLoader();
+const loadModelPromises = FISH_SPECIES.map(
+  (sp) =>
+    new Promise((resolve) => {
+      gltfLoader.load(
+        sp.url,
+        (gltf) => {
+          gltf.scene.updateMatrixWorld(true);
+          const box = new THREE.Box3().setFromObject(gltf.scene);
+          const size = new THREE.Vector3();
+          const centerOffset = new THREE.Vector3();
+          box.getSize(size);
+          box.getCenter(centerOffset);
+          const maxDim = Math.max(size.x, size.y, size.z) || 1;
+          MODEL_CACHE[sp.key] = {
+            scene: gltf.scene,
+            animations: gltf.animations || [],
+            normScale: sp.targetSize / maxDim,
+            centerOffset,
+          };
+          resolve();
+        },
+        undefined,
+        () => resolve() // nếu lỗi tải model thì tự động dùng cá procedural dự phòng
+      );
+    })
+);
+
+Promise.all(loadModelPromises).then(() => {
+  for (const key of INITIAL_SPECIES) {
+    fishList.push(new Fish(key));
+  }
+  updateFishCountUI();
+});
+
+// Nạp thêm model 3D tự nhiên cho Đá, San hô, Ốc và Tép
+function loadNormalizedGLB(url, targetSize, onLoaded) {
+  gltfLoader.load(url, (gltf) => {
+    const root = gltf.scene;
+    root.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(root);
+    const size = new THREE.Vector3();
+    const center = new THREE.Vector3();
+    box.getSize(size);
+    box.getCenter(center);
+    const maxDim = Math.max(size.x, size.y, size.z) || 1;
+    const scale = targetSize / maxDim;
+
+    const wrapper = new THREE.Group();
+    root.scale.setScalar(scale);
+    // Đặt đáy model (box.min.y) chạm đúng gốc Y = 0 và căn giữa X/Z
+    root.position.set(-center.x * scale, -box.min.y * scale, -center.z * scale);
+    root.traverse((obj) => {
+      if (obj.isMesh) {
+        obj.castShadow = true;
+        obj.receiveShadow = true;
+      }
+    });
+    wrapper.add(root);
+    onLoaded(wrapper);
+  });
+}
+
+// Đá tự nhiên & đá phủ rêu (dùng hoàn toàn model .glb sạch, không nứt cạnh)
+const naturalRockSpecs = [
+  { url: "./assets/models/Rock_Moss_1.glb", size: 1.05, x: 1.05, z: -0.9, rotY: 0.6 },
+  { url: "./assets/models/Rock_Moss_2.glb", size: 0.95, x: -2.25, z: -0.95, rotY: 1.8 },
+  { url: "./assets/models/Rock_1.glb", size: 0.9, x: 2.45, z: -0.35, rotY: 2.4 },
+  { url: "./assets/models/Rock_2.glb", size: 0.72, x: -0.35, z: 1.35, rotY: 0.3 },
+  { url: "./assets/models/Rock_1.glb", size: 0.62, x: 1.55, z: -0.25, rotY: 1.1 },
+  { url: "./assets/models/Rock_Moss_1.glb", size: 0.78, x: 2.95, z: -1.0, rotY: 3.1 },
+];
+for (const sp of naturalRockSpecs) {
+  loadNormalizedGLB(sp.url, sp.size, (mesh) => {
+    mesh.position.set(sp.x, FLOOR_Y, sp.z);
+    mesh.rotation.y = sp.rotY;
+    decor.add(mesh);
+  });
+}
+
+// San hô tự nhiên
+const naturalCoralSpecs = [
+  { url: "./assets/models/Coral_1.glb", size: 1.35, x: -1.6, z: -0.4, rotY: 0.4 },
+  { url: "./assets/models/Coral_2.glb", size: 0.95, x: 1.95, z: 0.35, rotY: -0.7 },
+  { url: "./assets/models/Coral_2.glb", size: 0.78, x: -2.65, z: 0.6, rotY: 1.9 },
+];
+for (const sp of naturalCoralSpecs) {
+  loadNormalizedGLB(sp.url, sp.size, (mesh) => {
+    mesh.position.set(sp.x, FLOOR_Y, sp.z);
+    mesh.rotation.y = sp.rotY;
+    decor.add(mesh);
+  });
+}
+
+let cachedSnailTemplate = null;
+let cachedShrimpTemplate = null;
+
+// Áp dụng model Ốc tự nhiên cho cả ốc đáy và ốc bám thành kính
+loadNormalizedGLB("./assets/models/Snail.glb", 0.24, (snailTemplate) => {
+  cachedSnailTemplate = snailTemplate;
+  for (const s of animatedSnails) {
+    s.root.remove(s.bodyGroup);
+    const clone = snailTemplate.clone(true);
+    s.root.add(clone);
+    s.bodyGroup = clone;
+    s.stalkL = null;
+    s.stalkR = null;
+  }
+});
+
+// Áp dụng model Tép tự nhiên (giữ lại 2 râu chuyển động)
+loadNormalizedGLB("./assets/models/Shrimp.glb", 0.34, (shrimpTemplate) => {
+  cachedShrimpTemplate = shrimpTemplate;
+  for (const sh of animatedShrimps) {
+    sh.root.remove(sh.bodyGroup);
+    const clone = shrimpTemplate.clone(true);
+    sh.root.add(clone);
+    sh.bodyGroup = clone;
+  }
+});
+
+// ----------------------------------------------------------------------
+// 9. HIỆU ỨNG NƯỚC (Caustics hắt sáng, Bong bóng khí, Tia sáng)
+// ----------------------------------------------------------------------
+const causticsUniforms = {
+  uTime: { value: 0 },
+  uIntensity: { value: 1.0 },
+  uSpotOnly: { value: 1.0 },
+};
+
+const causticsMat = new THREE.ShaderMaterial({
+  uniforms: causticsUniforms,
+  transparent: true,
+  depthWrite: false,
+  blending: THREE.AdditiveBlending,
+  vertexShader: `
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `,
+  fragmentShader: `
+    uniform float uTime;
+    uniform float uIntensity;
+    uniform float uSpotOnly;
+    varying vec2 vUv;
+
+    float causticPattern(vec2 p, float t) {
+      vec2 i = p;
+      float c = 1.0;
+      float inten = 0.005;
+      for (int n = 0; n < 4; n++) {
+        float time = t * (1.0 - (3.5 / float(n + 1)));
+        i = p + vec2(
+          cos(time - i.x) + sin(time + i.y),
+          sin(time - i.y) + cos(time + i.x)
+        );
+        c += 1.0 / length(vec2(
+          p.x / (sin(i.x + time) / inten),
+          p.y / (cos(i.y + time) / inten)
+        ));
+      }
+      c /= 4.0;
+      c = 1.17 - pow(c, 1.4);
+      return pow(abs(c), 8.0);
+    }
+
+    void main() {
+      vec2 uv = vUv * vec2(5.5, 3.2);
+      float c = causticPattern(uv, uTime * 0.35);
+      float edgeX = smoothstep(0.0, 0.08, vUv.x) * smoothstep(1.0, 0.92, vUv.x);
+      float edgeY = smoothstep(0.0, 0.08, vUv.y) * smoothstep(1.0, 0.92, vUv.y);
+      // Ban đêm chỉ hắt sóng caustics bên trong vòng tròn nón đèn chiếu
+      float distFromSpot = length((vUv - 0.5) * vec2(1.0, 0.65));
+      float spotMask = mix(1.0, smoothstep(0.42, 0.16, distFromSpot), uSpotOnly);
+      float alpha = clamp(c * 0.42 * uIntensity, 0.0, 0.6) * edgeX * edgeY * spotMask;
+      vec3 col = mix(vec3(0.18, 0.72, 1.0), vec3(0.75, 0.96, 1.0), clamp(c, 0.0, 1.0));
+      gl_FragColor = vec4(col, alpha);
+    }
+  `,
+});
+
+const causticsFloor = new THREE.Mesh(floorGeo, causticsMat);
+causticsFloor.rotation.x = -Math.PI / 2;
+causticsFloor.position.y = FLOOR_Y + 0.008;
+scene.add(causticsFloor);
+
+const rayGroup = new THREE.Group();
+const rayBaseMat = new THREE.MeshBasicMaterial({
+  color: 0x6fd8ff,
+  transparent: true,
+  opacity: 0.035,
+  blending: THREE.AdditiveBlending,
+  depthWrite: false,
+  side: THREE.DoubleSide,
+});
+const rayConfigs = [
+  { x: -1.8, z: -0.4, topR: 0.45, botR: 1.2, rotZ: 0.12 },
+  { x: 0.4, z: 0.3, topR: 0.55, botR: 1.45, rotZ: 0.08 },
+  { x: 2.1, z: -0.2, topR: 0.4, botR: 1.1, rotZ: 0.1 },
+];
+const rayMeshes = [];
+for (const rc of rayConfigs) {
+  const ray = new THREE.Mesh(
+    new THREE.CylinderGeometry(rc.topR, rc.botR, TANK.height * 0.92, 16, 1, true),
+    rayBaseMat.clone()
+  );
+  ray.position.set(rc.x, 0, rc.z);
+  ray.rotation.z = rc.rotZ;
+  rayGroup.add(ray);
+  rayMeshes.push(ray);
+}
+scene.add(rayGroup);
+
+function createBubbleTexture() {
+  const size = 64;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+
+  const cx = size / 2;
+  const cy = size / 2;
+  const r = size * 0.45;
+
+  const grad = ctx.createRadialGradient(cx, cy, r * 0.1, cx, cy, r);
+  grad.addColorStop(0.0, "rgba(200, 240, 255, 0.05)");
+  grad.addColorStop(0.65, "rgba(180, 235, 255, 0.25)");
+  grad.addColorStop(0.88, "rgba(230, 250, 255, 0.85)");
+  grad.addColorStop(1.0, "rgba(255, 255, 255, 0.0)");
+
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
+  ctx.beginPath();
+  ctx.arc(cx - r * 0.32, cy - r * 0.32, r * 0.16, 0, Math.PI * 2);
+  ctx.fill();
+
+  return new THREE.CanvasTexture(canvas);
+}
+
+const BUBBLE_COUNT = 140;
+const bubblePositions = new Float32Array(BUBBLE_COUNT * 3);
+const bubbleBaseXZ = [];
+const BUBBLE_BOUNDS = {
+  xMin: -TANK.width / 2 + 0.35,
+  xMax: TANK.width / 2 - 0.35,
+  yMin: FLOOR_Y + 0.15,
+  yMax: TANK.height / 2 - 0.12,
+  zMin: -TANK.depth / 2 + 0.35,
+  zMax: TANK.depth / 2 - 0.35,
+};
+
+const bubbleEmitters = [
+  { x: -2.7, z: -0.3 },
+  { x: 1.5, z: 1.1 },
+  { x: 2.3, z: 0.1 },
+];
+
+function resetBubble(i, randomY = false) {
+  let bx, bz;
+  if (Math.random() < 0.65) {
+    const em = bubbleEmitters[Math.floor(Math.random() * bubbleEmitters.length)];
+    bx = THREE.MathUtils.clamp(em.x + (Math.random() - 0.5) * 0.55, BUBBLE_BOUNDS.xMin, BUBBLE_BOUNDS.xMax);
+    bz = THREE.MathUtils.clamp(em.z + (Math.random() - 0.5) * 0.55, BUBBLE_BOUNDS.zMin, BUBBLE_BOUNDS.zMax);
+  } else {
+    bx = THREE.MathUtils.randFloat(BUBBLE_BOUNDS.xMin, BUBBLE_BOUNDS.xMax);
+    bz = THREE.MathUtils.randFloat(BUBBLE_BOUNDS.zMin, BUBBLE_BOUNDS.zMax);
+  }
+  const by = randomY
+    ? THREE.MathUtils.randFloat(BUBBLE_BOUNDS.yMin, BUBBLE_BOUNDS.yMax)
+    : BUBBLE_BOUNDS.yMin + Math.random() * 0.25;
+
+  bubblePositions[i * 3] = bx;
+  bubblePositions[i * 3 + 1] = by;
+  bubblePositions[i * 3 + 2] = bz;
+
+  bubbleBaseXZ[i] = {
+    x: bx,
+    z: bz,
+    speed: THREE.MathUtils.randFloat(0.45, 1.15),
+    phase: Math.random() * Math.PI * 2,
+    amp: THREE.MathUtils.randFloat(0.03, 0.09),
+  };
+}
+
+for (let i = 0; i < BUBBLE_COUNT; i++) {
+  resetBubble(i, true);
+}
+
+const bubbleGeo = new THREE.BufferGeometry();
+bubbleGeo.setAttribute("position", new THREE.BufferAttribute(bubblePositions, 3));
+
+const bubbleMat = new THREE.PointsMaterial({
+  map: createBubbleTexture(),
+  size: 0.14,
+  transparent: true,
+  opacity: 0.85,
+  depthWrite: false,
+  blending: THREE.AdditiveBlending,
+  sizeAttenuation: true,
+});
+
+scene.add(new THREE.Points(bubbleGeo, bubbleMat));
+
+// ----------------------------------------------------------------------
+// 10. TƯƠNG TÁC (Click cá bơi theo chuột, Thêm/Bớt cá, Ngày/Đêm, Ẩn HUD)
+// ----------------------------------------------------------------------
+const fishCountEl = document.getElementById("fish-count");
+const shrimpCountEl = document.getElementById("shrimp-count");
+const snailCountEl = document.getElementById("snail-count");
+const followStatusEl = document.getElementById("follow-status");
+const btnAdd = document.getElementById("btn-add");
+const btnRemove = document.getElementById("btn-remove");
+const btnAddShrimp = document.getElementById("btn-add-shrimp");
+const btnRemoveShrimp = document.getElementById("btn-remove-shrimp");
+const btnAddSnail = document.getElementById("btn-add-snail");
+const btnRemoveSnail = document.getElementById("btn-remove-snail");
+const btnDayNight = document.getElementById("btn-daynight");
+const hudToggleBtn = document.getElementById("hud-toggle");
+
+let selectedFish = null;
+let isDayMode = false;
+
+const cursorMarker = new THREE.Mesh(
+  new THREE.RingGeometry(0.12, 0.17, 24),
+  new THREE.MeshBasicMaterial({
+    color: 0xffd480,
+    side: THREE.DoubleSide,
+    transparent: true,
+    opacity: 0.85,
+  })
+);
+cursorMarker.visible = false;
+scene.add(cursorMarker);
+
+function updateFishCountUI() {
+  fishCountEl.textContent = String(fishList.length);
+}
+function updateShrimpCountUI() {
+  shrimpCountEl.textContent = String(animatedShrimps.length);
+}
+function updateSnailCountUI() {
+  snailCountEl.textContent = String(animatedSnails.length);
+}
+
+function selectFish(fish) {
+  if (selectedFish) {
+    selectedFish.setHighlighted(false);
+  }
+  selectedFish = fish;
+  if (selectedFish) {
+    selectedFish.setHighlighted(true);
+    followStatusEl.textContent = `Đang dẫn ${selectedFish.label} theo chuột`;
+    cursorMarker.position.copy(selectedFish.target);
+    cursorMarker.visible = true;
+  } else {
+    followStatusEl.textContent = "Chưa chọn cá nào";
+    cursorMarker.visible = false;
+  }
+}
+
+btnAdd.addEventListener("click", () => {
+  if (fishList.length >= 25) return;
+  const randomSpecies = FISH_SPECIES[Math.floor(Math.random() * FISH_SPECIES.length)];
+  fishList.push(new Fish(randomSpecies.key));
+  updateFishCountUI();
+});
+
+btnRemove.addEventListener("click", () => {
+  if (fishList.length <= 0) return;
+  const removed = fishList.pop();
+  if (removed === selectedFish) {
+    selectFish(null);
+  }
+  removed.dispose();
+  updateFishCountUI();
+});
+
+btnAddShrimp.addEventListener("click", () => {
+  if (animatedShrimps.length >= 20) return;
+  const cx = THREE.MathUtils.randFloat(-TANK.width / 2 + 0.7, TANK.width / 2 - 0.7);
+  const cz = THREE.MathUtils.randFloat(-TANK.depth / 2 + 0.7, TANK.depth / 2 - 0.7);
+  createAnimatedShrimp(cx, cz, THREE.MathUtils.randFloat(0.22, 0.42));
+  if (cachedShrimpTemplate) {
+    const sh = animatedShrimps[animatedShrimps.length - 1];
+    sh.root.remove(sh.bodyGroup);
+    const clone = cachedShrimpTemplate.clone(true);
+    sh.root.add(clone);
+    sh.bodyGroup = clone;
+  }
+  updateShrimpCountUI();
+});
+
+btnRemoveShrimp.addEventListener("click", () => {
+  if (animatedShrimps.length <= 0) return;
+  const removed = animatedShrimps.pop();
+  decor.remove(removed.root);
+  updateShrimpCountUI();
+});
+
+btnAddSnail.addEventListener("click", () => {
+  if (animatedSnails.length >= 20) return;
+  const surfaces = ["floor", "front", "left", "right"];
+  const surface = surfaces[Math.floor(Math.random() * surfaces.length)];
+  const speed = (Math.random() < 0.5 ? 1 : -1) * THREE.MathUtils.randFloat(0.1, 0.2);
+  if (surface === "floor") {
+    createAnimatedSnail({
+      surface: "floor",
+      cx: THREE.MathUtils.randFloat(-TANK.width / 2 + 0.7, TANK.width / 2 - 0.7),
+      cz: THREE.MathUtils.randFloat(-TANK.depth / 2 + 0.7, TANK.depth / 2 - 0.7),
+      orbitR: THREE.MathUtils.randFloat(0.22, 0.4),
+      speed,
+    });
+  } else if (surface === "front") {
+    createAnimatedSnail({
+      surface: "front",
+      cx: THREE.MathUtils.randFloat(-TANK.width / 2 + 0.9, TANK.width / 2 - 0.9),
+      cy: THREE.MathUtils.randFloat(-1.1, 1.1),
+      orbitR: THREE.MathUtils.randFloat(0.3, 0.48),
+      speed,
+    });
+  } else {
+    createAnimatedSnail({
+      surface,
+      cy: THREE.MathUtils.randFloat(-1.1, 1.1),
+      cz: THREE.MathUtils.randFloat(-TANK.depth / 2 + 0.8, TANK.depth / 2 - 0.8),
+      orbitR: THREE.MathUtils.randFloat(0.28, 0.45),
+      speed,
+    });
+  }
+  if (cachedSnailTemplate) {
+    const s = animatedSnails[animatedSnails.length - 1];
+    s.root.remove(s.bodyGroup);
+    const clone = cachedSnailTemplate.clone(true);
+    s.root.add(clone);
+    s.bodyGroup = clone;
+    s.stalkL = null;
+    s.stalkR = null;
+  }
+  updateSnailCountUI();
+});
+
+btnRemoveSnail.addEventListener("click", () => {
+  if (animatedSnails.length <= 0) return;
+  const removed = animatedSnails.pop();
+  decor.remove(removed.root);
+  updateSnailCountUI();
+});
+
+function applyDayNightMode() {
+  // Luôn giữ nền xung quanh hồ cá tối (kể cả ban ngày)
+  scene.background.setHex(NIGHT_BG);
+  scene.fog.color.setHex(NIGHT_BG);
+
+  if (isDayMode) {
+    scene.fog.density = 0.02;
+    hemiLight.color.setHex(0xbfefff);
+    hemiLight.groundColor.setHex(0x3a556e);
+    hemiLight.intensity = 0.65;
+    mainLight.color.setHex(0xfff6e5);
+    mainLight.intensity = 6.0;
+    mainLight.angle = Math.PI * 0.45;
+    depthGlow.intensity = 0.45;
+    tankLedFill.intensity = 1.25;
+    causticsUniforms.uIntensity.value = 1.25;
+    causticsUniforms.uSpotOnly.value = 0.0;
+    btnDayNight.textContent = "Chế độ: Ngày";
+  } else {
+    scene.fog.density = 0.042;
+    // Tắt ánh sáng môi trường & đèn tỏa 360 độ -> chỉ vùng nón đèn SpotLight mới sáng
+    hemiLight.intensity = 0.0;
+    depthGlow.intensity = 0.0;
+    tankLedFill.intensity = 0.0;
+    mainLight.color.setHex(0xdff5ff);
+    mainLight.intensity = 6.8;
+    mainLight.angle = Math.PI * 0.28;
+    causticsUniforms.uIntensity.value = 1.0;
+    causticsUniforms.uSpotOnly.value = 1.0;
+    btnDayNight.textContent = "Chế độ: Đêm";
+  }
+}
+applyDayNightMode();
+
+btnDayNight.addEventListener("click", () => {
+  isDayMode = !isDayMode;
+  applyDayNightMode();
+});
+
+function toggleHUD() {
+  const hidden = document.body.classList.toggle("hud-hidden");
+  hudToggleBtn.textContent = hidden ? "Hiện giao diện (H)" : "Ẩn giao diện (H)";
+}
+hudToggleBtn.addEventListener("click", toggleHUD);
+window.addEventListener("keydown", (e) => {
+  if (e.key === "h" || e.key === "H") {
+    toggleHUD();
+  }
+});
+
+const raycaster = new THREE.Raycaster();
+const pointerNDC = new THREE.Vector2();
+const dragPlane = new THREE.Plane();
+const planeNormal = new THREE.Vector3();
+const hitPoint = new THREE.Vector3();
+let pointerDownPos = { x: 0, y: 0 };
+
+renderer.domElement.addEventListener("pointerdown", (e) => {
+  pointerDownPos = { x: e.clientX, y: e.clientY };
+});
+
+renderer.domElement.addEventListener("pointerup", (e) => {
+  if (Math.hypot(e.clientX - pointerDownPos.x, e.clientY - pointerDownPos.y) > 6) return;
+
+  pointerNDC.x = (e.clientX / window.innerWidth) * 2 - 1;
+  pointerNDC.y = -(e.clientY / window.innerHeight) * 2 + 1;
+
+  raycaster.setFromCamera(pointerNDC, camera);
+  const hits = raycaster.intersectObjects(fishList.map((f) => f.group), true);
+
+  if (hits.length > 0) {
+    const clickedFish = hits[0].object.userData.fish;
+    if (clickedFish) {
+      selectFish(clickedFish === selectedFish ? null : clickedFish);
+      return;
+    }
+  }
+  if (selectedFish) {
+    selectFish(null);
+  }
+});
+
+renderer.domElement.addEventListener("pointermove", (e) => {
+  if (!selectedFish) return;
+
+  pointerNDC.x = (e.clientX / window.innerWidth) * 2 - 1;
+  pointerNDC.y = -(e.clientY / window.innerHeight) * 2 + 1;
+
+  raycaster.setFromCamera(pointerNDC, camera);
+  camera.getWorldDirection(planeNormal);
+  dragPlane.setFromNormalAndCoplanarPoint(planeNormal, selectedFish.position);
+
+  if (raycaster.ray.intersectPlane(dragPlane, hitPoint)) {
+    hitPoint.x = THREE.MathUtils.clamp(hitPoint.x, SWIM_BOUNDS.xMin, SWIM_BOUNDS.xMax);
+    hitPoint.y = THREE.MathUtils.clamp(hitPoint.y, SWIM_BOUNDS.yMin, SWIM_BOUNDS.yMax);
+    hitPoint.z = THREE.MathUtils.clamp(hitPoint.z, SWIM_BOUNDS.zMin, SWIM_BOUNDS.zMax);
+    selectedFish.target.copy(hitPoint);
+    cursorMarker.position.copy(hitPoint);
+  }
+});
+
+// ----------------------------------------------------------------------
+// 11. RESIZE HANDLER
+// ----------------------------------------------------------------------
+window.addEventListener("resize", () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// ----------------------------------------------------------------------
+// 12. VÒNG LẶP RENDER
+// ----------------------------------------------------------------------
+const clock = new THREE.Clock();
+window.__AQUARIUM_READY__ = true;
+
+// Biến tạm cho vòng lặp ốc bám kính (tránh cấp phát mỗi frame)
+const _snailFwd = new THREE.Vector3();
+const _snailNorm = new THREE.Vector3();
+const _snailRight = new THREE.Vector3();
+const _snailMat = new THREE.Matrix4();
+
+function orientSnailOnGlass(root, fx, fy, fz, nx, ny, nz) {
+  _snailFwd.set(fx, fy, fz).normalize();
+  _snailNorm.set(nx, ny, nz);
+  _snailRight.crossVectors(_snailNorm, _snailFwd).normalize();
+  _snailMat.makeBasis(_snailRight, _snailNorm, _snailFwd);
+  root.quaternion.setFromRotationMatrix(_snailMat);
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  const elapsed = clock.getElapsedTime();
+
+  for (let i = 0; i < fishList.length; i++) {
+    fishList[i].update(dt, elapsed);
+  }
+
+  // Rêu & rong thủy sinh đung đưa nhẹ theo dòng nước
+  for (let i = 0; i < swayingPlants.length; i++) {
+    const p = swayingPlants[i];
+    p.pivot.rotation.z = p.baseRotZ + Math.sin(elapsed * p.speed + p.phase) * p.amp;
+    p.pivot.rotation.x = Math.cos(elapsed * p.speed * 0.8 + p.phase) * (p.amp * 0.55);
+  }
+
+  // Ốc cảnh: bò dưới nền cát hoặc bám bò trực tiếp trên thành kính
+  for (let i = 0; i < animatedSnails.length; i++) {
+    const s = animatedSnails[i];
+    const ang = elapsed * s.speed + s.phase;
+    const vx = -Math.sin(ang) * s.speed;
+    const vy = Math.cos(ang) * s.speed;
+
+    if (s.surface === "floor") {
+      s.root.position.set(s.cx + Math.cos(ang) * s.orbitR, FLOOR_Y + 0.02, s.cz + Math.sin(ang) * s.orbitR);
+      s.root.rotation.set(0, -ang + (s.speed >= 0 ? 0 : Math.PI), 0);
+    } else if (s.surface === "front") {
+      s.root.position.set(s.cx + Math.cos(ang) * s.orbitR, s.cy + Math.sin(ang) * s.orbitR, TANK.depth / 2 - 0.02);
+      orientSnailOnGlass(s.root, vx, vy, 0, 0, 0, -1);
+    } else if (s.surface === "left" || s.surface === "right") {
+      const isLeft = s.surface === "left";
+      s.root.position.set(
+        isLeft ? -TANK.width / 2 + 0.02 : TANK.width / 2 - 0.02,
+        s.cy + Math.sin(ang) * s.orbitR,
+        s.cz + Math.cos(ang) * s.orbitR
+      );
+      orientSnailOnGlass(s.root, 0, vy, vx, isLeft ? 1 : -1, 0, 0);
+    }
+
+    if (s.stalkL && s.stalkR) {
+      s.stalkL.rotation.z = Math.sin(elapsed * 2.2 + s.phase) * 0.16;
+      s.stalkR.rotation.z = -Math.sin(elapsed * 2.2 + s.phase + 0.5) * 0.16;
+    }
+  }
+
+  // Tép cảnh: bò rà đáy, dừng cúi đầu gặm rêu, thi thoảng búng nhảy lướt nước
+  for (let i = 0; i < animatedShrimps.length; i++) {
+    const sh = animatedShrimps[i];
+    sh.stateTimer -= dt;
+
+    if (sh.state === "crawl") {
+      const dx = sh.targetX - sh.root.position.x;
+      const dz = sh.targetZ - sh.root.position.z;
+      const dist = Math.hypot(dx, dz);
+      if (dist < 0.08 || sh.stateTimer <= 0) {
+        const r = Math.random();
+        if (r < 0.55) {
+          sh.state = "graze";
+          sh.stateTimer = 1.0 + Math.random() * 1.5;
+        } else {
+          sh.state = "hop";
+          sh.hopProgress = 0;
+          sh.hopHeight = 0.18 + Math.random() * 0.24;
+          sh.targetX = THREE.MathUtils.clamp(sh.root.position.x + (Math.random() - 0.5) * 1.5, -TANK.width / 2 + 0.5, TANK.width / 2 - 0.5);
+          sh.targetZ = THREE.MathUtils.clamp(sh.root.position.z + (Math.random() - 0.5) * 1.2, -TANK.depth / 2 + 0.5, TANK.depth / 2 - 0.5);
+        }
+      } else {
+        const vx = (dx / dist) * sh.speed;
+        const vz = (dz / dist) * sh.speed;
+        sh.root.position.x += vx * dt;
+        sh.root.position.z += vz * dt;
+        sh.root.position.y = FLOOR_Y + 0.02 + Math.abs(Math.sin(elapsed * 16 + sh.phase)) * 0.01;
+        sh.root.rotation.y = Math.atan2(vx, vz);
+        sh.bodyGroup.rotation.x = 0.04;
+        sh.bodyGroup.rotation.z = Math.sin(elapsed * 14 + sh.phase) * 0.055;
+      }
+    } else if (sh.state === "graze") {
+      sh.root.position.y = FLOOR_Y + 0.02;
+      sh.bodyGroup.rotation.x = 0.16 + Math.sin(elapsed * 9 + sh.phase) * 0.06;
+      sh.bodyGroup.rotation.z = Math.sin(elapsed * 5 + sh.phase) * 0.04;
+      if (sh.stateTimer <= 0) {
+        sh.state = "crawl";
+        sh.stateTimer = 2.0 + Math.random() * 2.5;
+        sh.targetX = THREE.MathUtils.clamp(sh.root.position.x + (Math.random() - 0.5) * 1.8, -TANK.width / 2 + 0.5, TANK.width / 2 - 0.5);
+        sh.targetZ = THREE.MathUtils.clamp(sh.root.position.z + (Math.random() - 0.5) * 1.4, -TANK.depth / 2 + 0.5, TANK.depth / 2 - 0.5);
+      }
+    } else if (sh.state === "hop") {
+      sh.hopProgress += dt * 1.35;
+      if (sh.hopProgress >= 1) {
+        sh.root.position.y = FLOOR_Y + 0.02;
+        sh.bodyGroup.rotation.x = 0;
+        sh.state = "graze";
+        sh.stateTimer = 0.8 + Math.random() * 1.2;
+      } else {
+        const t = sh.hopProgress;
+        const dx = sh.targetX - sh.root.position.x;
+        const dz = sh.targetZ - sh.root.position.z;
+        sh.root.position.x += dx * dt * 2.4;
+        sh.root.position.z += dz * dt * 2.4;
+        // Quỹ đạo nhảy parabol nhẹ trên nền cát
+        sh.root.position.y = FLOOR_Y + 0.02 + Math.sin(t * Math.PI) * sh.hopHeight;
+        sh.root.rotation.y = Math.atan2(dx, dz);
+        // Ngóc đầu khi búng lên, chúi nhẹ khi đáp xuống
+        sh.bodyGroup.rotation.x = -Math.cos(t * Math.PI) * 0.35;
+        sh.bodyGroup.rotation.z = Math.sin(elapsed * 18 + sh.phase) * 0.08;
+      }
+    }
+
+    // Râu tép rung và quét liên tục
+    if (sh.antL && sh.antR) {
+      sh.antL.rotation.z = 0.25 + Math.sin(elapsed * 6.5 + sh.phase) * 0.28;
+      sh.antR.rotation.z = -0.25 - Math.cos(elapsed * 6.5 + sh.phase) * 0.28;
+    }
+  }
+
+  if (cursorMarker.visible) {
+    cursorMarker.lookAt(camera.position);
+  }
+
+  causticsUniforms.uTime.value = elapsed;
+
+  const wPos = waterTopGeo.attributes.position;
+  for (let i = 0; i < wPos.count; i++) {
+    const wx = wPos.getX(i);
+    const wy = wPos.getY(i);
+    const wave =
+      Math.sin(wx * 1.4 + elapsed * 1.6) * 0.02 +
+      Math.cos(wy * 1.8 - elapsed * 1.3) * 0.015;
+    wPos.setZ(i, waterTopBaseZ[i] + wave);
+  }
+  wPos.needsUpdate = true;
+  waterTopGeo.computeVertexNormals();
+
+  const rayBaseOpacity = isDayMode ? 0.045 : 0.025;
+  for (let i = 0; i < rayMeshes.length; i++) {
+    rayMeshes[i].material.opacity = rayBaseOpacity + 0.015 * Math.sin(elapsed * 0.8 + i * 2.1);
+  }
+
+  const bPos = bubbleGeo.attributes.position.array;
+  for (let i = 0; i < BUBBLE_COUNT; i++) {
+    const meta = bubbleBaseXZ[i];
+    const y = bPos[i * 3 + 1] + meta.speed * dt;
+    if (y > BUBBLE_BOUNDS.yMax) {
+      resetBubble(i, false);
+      continue;
+    }
+    bPos[i * 3] = THREE.MathUtils.clamp(
+      meta.x + Math.sin(elapsed * 2.4 + meta.phase) * meta.amp,
+      BUBBLE_BOUNDS.xMin,
+      BUBBLE_BOUNDS.xMax
+    );
+    bPos[i * 3 + 1] = y;
+    bPos[i * 3 + 2] = THREE.MathUtils.clamp(
+      meta.z + Math.cos(elapsed * 1.9 + meta.phase) * meta.amp,
+      BUBBLE_BOUNDS.zMin,
+      BUBBLE_BOUNDS.zMax
+    );
+  }
+  bubbleGeo.attributes.position.needsUpdate = true;
+
+  controls.update();
+  renderer.render(scene, camera);
+}
+animate();
+</script>
+</body>
+</html>
