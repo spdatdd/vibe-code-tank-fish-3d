@@ -1,0 +1,9 @@
+{
+  "name": "be-ca-3d",
+  "version": "1.0.0",
+  "description": "Mo phong Be ca 3D bang Three.js",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  }
+}
