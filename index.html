@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
 <title>Bể cá 3D — Bước 6: Tối ưu & Đóng gói</title>
 <style>
   html, body {
@@ -32,8 +32,8 @@
   }
   #controls {
     position: absolute;
-    top: 12px;
-    right: 12px;
+    top: max(12px, env(safe-area-inset-top));
+    right: max(12px, env(safe-area-inset-right));
     display: flex;
     flex-direction: column;
     gap: 8px;
@@ -46,7 +46,25 @@
     color: #cfe9ff;
     font-size: 13px;
     min-width: 195px;
+    max-height: calc(100vh - 68px);
+    max-height: calc(100dvh - 68px);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    touch-action: pan-y;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(110, 200, 255, 0.45) transparent;
     transition: opacity 0.2s;
+  }
+  #controls::-webkit-scrollbar {
+    width: 5px;
+  }
+  #controls::-webkit-scrollbar-thumb {
+    background: rgba(110, 200, 255, 0.45);
+    border-radius: 999px;
+  }
+  #controls::-webkit-scrollbar-track {
+    background: transparent;
   }
   .btn-row {
     display: flex;
