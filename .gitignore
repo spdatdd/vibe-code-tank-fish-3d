@@ -1,4 +1,5 @@
 node_modules/
+assets/models-optimized/
 .DS_Store
 Thumbs.db
 *.log

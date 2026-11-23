@@ -20,6 +20,9 @@ const MIME_TYPES = {
   ".md": "text/markdown; charset=utf-8",
   ".glb": "model/gltf-binary",
   ".gltf": "model/gltf+json",
+  ".ogg": "audio/ogg",
+  ".mp3": "audio/mpeg",
+  ".wav": "audio/wav",
 };
 
 const server = http.createServer((req, res) => {
